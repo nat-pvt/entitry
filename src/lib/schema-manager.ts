@@ -41,5 +41,48 @@ datasource db {
 `;
         fs.writeFileSync(DEFAULT_SCHEMA_PATH, basicContent);
         return DEFAULT_SCHEMA_PATH;
+    },
+
+    addModel: (schemaPath: string, modelName: string) => {
+        const content = fs.readFileSync(schemaPath, 'utf-8');
+        const schema = getSchema(content);
+        const newModel = {
+            type: 'model',
+            name: modelName,
+            properties: [
+                {
+                    type: 'field',
+                    name: 'id',
+                    fieldType: 'Int',
+                    attributes: [
+                        {
+                            type: 'attribute',
+                            kind: 'field',
+                            name: 'id',
+                            args: [] 
+                        },
+                        {
+                            type: 'attribute',
+                            kind: 'field',
+                            name: 'default',
+                            args: [
+                                {
+                                    value: {
+                                        type: 'function',
+                                        name: 'autoincrement',
+                                        args: []
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        };
+
+        schema.list.push(newModel as any);
+
+        const newContent = printSchema(schema);
+        fs.writeFileSync(schemaPath, newContent);
     }
-}
+};

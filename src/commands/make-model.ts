@@ -52,5 +52,16 @@ export async function makeModel() {
         process.exit(0);
     }
 
-    outro(pc.green(`The schema.prisma file has been updated.`));
+    s.start(`Adding model ${modelName} to the schema...`);
+
+    try {
+        schemaManager.addModel(schemaPath!, modelName as string);
+        s.stop(pc.green('Schema successfully updated!'));
+    } catch (error) {
+        s.stop(pc.red('Error while writing the file.'));
+        console.error(error);
+        process.exit(1);
+    }
+
+    outro(pc.green(`Done! You can now run “npx prisma format” to clean up the file.`));
 }
