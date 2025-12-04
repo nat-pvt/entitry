@@ -4,6 +4,12 @@ import { getSchema, printSchema } from '@mrleebo/prisma-ast';
 
 const DEFAULT_SCHEMA_PATH = path.join(process.cwd(), 'prisma', 'schema.prisma');
 
+export interface ModelField {
+    name: string;
+    type: string;
+    isOptional: boolean;
+}
+
 export const schemaManager = {
     findPath: () => {
         const pathsToCheck = [
@@ -43,41 +49,50 @@ datasource db {
         return DEFAULT_SCHEMA_PATH;
     },
 
-    addModel: (schemaPath: string, modelName: string) => {
+    addModel: (schemaPath: string, modelName: string, customFields: ModelField[]) => {
         const content = fs.readFileSync(schemaPath, 'utf-8');
         const schema = getSchema(content);
-        const newModel = {
-            type: 'model',
-            name: modelName,
-            properties: [
+
+        const idField = {
+            type: 'field',
+            name: 'id',
+            fieldType: 'Int',
+            attributes: [
                 {
-                    type: 'field',
+                    type: 'attribute',
+                    kind: 'field',
                     name: 'id',
-                    fieldType: 'Int',
-                    attributes: [
+                    args: [] 
+                },
+                {
+                    type: 'attribute',
+                    kind: 'field',
+                    name: 'default',
+                    args: [
                         {
-                            type: 'attribute',
-                            kind: 'field',
-                            name: 'id',
-                            args: [] 
-                        },
-                        {
-                            type: 'attribute',
-                            kind: 'field',
-                            name: 'default',
-                            args: [
-                                {
-                                    value: {
-                                        type: 'function',
-                                        name: 'autoincrement',
-                                        args: []
-                                    }
-                                }
-                            ]
+                            value: {
+                                type: 'function',
+                                name: 'autoincrement',
+                                args: []
+                            }
                         }
                     ]
                 }
             ]
+        }
+
+        const otherFields = customFields.map(field => ({
+            type: 'field',
+            name: field.name,
+            fieldType: field.type,
+            optional: field.isOptional,
+            attributes: []
+        }));
+
+        const newModel = {
+            type: 'model',
+            name: modelName,
+            properties: [idField, ...otherFields]
         };
 
         schema.list.push(newModel as any);
