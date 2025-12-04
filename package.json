@@ -1,0 +1,30 @@
+{
+  "name": "entitry",
+  "version": "0.0.1",
+  "bin": {
+    "entitry": "./dist/index.js"
+  },
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs --clean",
+    "dev": "ts-node src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@clack/prompts": "^0.11.0",
+    "@mrleebo/prisma-ast": "^0.13.1",
+    "cac": "^6.7.14",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "ts-node": "^10.9.2",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
+  }
+}
