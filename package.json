@@ -4,16 +4,33 @@
   "bin": {
     "entitry": "./dist/index.js"
   },
-  "description": "",
+  "description": "A CLI tool to generate Prisma models interactively, inspired by Symfony's make:entity",
   "main": "index.js",
   "scripts": {
     "build": "tsup src/index.ts --format cjs --clean",
     "dev": "ts-node src/index.ts",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "prepublishOnly": "npm run build"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "prisma",
+    "cli",
+    "generator",
+    "schema",
+    "interactive",
+    "database",
+    "modeling"
+  ],
+  "author": "Nathan Piveteau piveteaunat@gmail.com",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nat-pvt/entitry.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nat-pvt/entitry/issues"
+  },
+  "homepage": "https://github.com/ton-pseudo/entitry#readme",
   "type": "commonjs",
   "dependencies": {
     "@clack/prompts": "^0.11.0",
