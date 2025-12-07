@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { cac } from 'cac';
 import { makeModel } from './commands/make-model';
 import pc from 'picocolors';
