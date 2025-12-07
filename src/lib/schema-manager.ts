@@ -8,6 +8,9 @@ export interface ModelField {
     name: string;
     type: string;
     isOptional: boolean;
+    isRelation?: boolean;
+    relationType?: '1-1' | '1-n' | 'n-n' | 'n-1';
+    relationTarget?: string;
 }
 
 export const schemaManager = {
@@ -67,65 +70,123 @@ datasource db {
     addModel: (schemaPath: string, modelName: string, customFields: ModelField[]) => {
         const content = fs.readFileSync(schemaPath, 'utf-8');
         const schema = getSchema(content);
-
-        const newAstFields = customFields.map(field => ({
-            type: 'field',
-            name: field.name,
-            fieldType: field.type,
-            optional: field.isOptional,
-            attributes: []
-        }));
-
-        const existingModel = schema.list.find(
-            (item: any) => item.type === 'model' && item.name === modelName
-        ) as any;
-
-        if (existingModel) {
-            const fieldsToAdd = newAstFields.filter(newField =>
-                !existingModel.properties.some((existingProp: any) => 
-                    existingProp.type === 'field' && existingProp.name === newField.name
-                )
-            );
-
-            if (fieldsToAdd.length > 0) {
-                existingModel.properties.push(...fieldsToAdd);
-            }
-        } else {
-            const idField = {
-                type: 'field',
-                name: 'id',
-                fieldType: 'Int',
-                attributes: [
-                    {
-                        type: 'attribute',
-                        kind: 'field',
-                        name: 'id',
-                        args: [] 
-                    },
-                    {
-                        type: 'attribute',
-                        kind: 'field',
-                        name: 'default',
-                        args: [
-                            {
-                                value: {
-                                    type: 'function',
-                                    name: 'autoincrement',
-                                    args: []
-                                }
-                            }
-                        ]
-                    }
-                ]
-            }
-
-            const newModel = {
-                type: 'model',
-                name: modelName,
-                properties: [idField, ...newAstFields]
+        
+        let mainModel = schema.list.find((item: any) => item.type === 'model' && item.name === modelName) as any;
+        if (!mainModel) {
+            mainModel = {
+                type: 'model', name: modelName,
+                properties: [{
+                    type: 'field', name: 'id', fieldType: 'Int',
+                    attributes: [{ type: 'attribute', kind: 'field', name: 'id', args: [] }, { type: 'attribute', kind: 'field', name: 'default', args: [{ value: { type: 'function', name: 'autoincrement', args: [] } }] }]
+                }]
             };
+            schema.list.push(mainModel);
+        }
 
-            schema.list.push(newModel as any);
+        const getUniqueFieldName = (model: any, baseName: string) => {
+            let name = baseName;
+            let counter = 2;
+            while (model.properties.some((p: any) => p.name === name)) {
+                name = `${baseName}_${counter}`;
+                counter++;
+            }
+            return name;
+        };
+
+        for (const field of customFields) {
+            const exists = mainModel.properties.some((p: any) => p.type === 'field' && p.name === field.name);
+            if (exists) continue;
+
+            if (field.isRelation && field.relationTarget) {
+                const relationName = `${modelName}_${field.name}`;
+                const targetModel = schema.list.find((item: any) => item.type === 'model' && item.name === field.relationTarget) as any;
+
+                if (field.relationType === 'n-1') {
+                    const fkName = `${field.name}Id`;
+                    mainModel.properties.push({
+                        type: 'field', name: field.name, fieldType: field.relationTarget, optional: field.isOptional,
+                        attributes: [{
+                            type: 'attribute', kind: 'field', name: 'relation',
+                            args: [
+                                { type: 'attributeArgument', value: `"${relationName}"` },
+                                { type: 'attributeArgument', value: { type: 'keyValue', key: 'fields', value: { type: 'array', args: [fkName] } } },
+                                { type: 'attributeArgument', value: { type: 'keyValue', key: 'references', value: { type: 'array', args: ['id'] } } }
+                            ]
+                        }]
+                    });
+                    mainModel.properties.push({ type: 'field', name: fkName, fieldType: 'Int', optional: field.isOptional, attributes: [] });
+
+                    if (targetModel) {
+                        const backFieldName = getUniqueFieldName(targetModel, modelName.toLowerCase() + 's');
+                        targetModel.properties.push({ 
+                            type: 'field', name: backFieldName, fieldType: modelName, array: true, 
+                            attributes: [{ type: 'attribute', kind: 'field', name: 'relation', args: [{ type: 'attributeArgument', value: `"${relationName}"` }] }] 
+                        });
+                    }
+                }
+
+                else if (field.relationType === '1-n') {
+                    mainModel.properties.push({
+                        type: 'field', name: field.name, fieldType: field.relationTarget, array: true,
+                        attributes: [{ type: 'attribute', kind: 'field', name: 'relation', args: [{ type: 'attributeArgument', value: `"${relationName}"` }] }]
+                    });
+
+                    if (targetModel) {
+                        const backFieldName = getUniqueFieldName(targetModel, modelName.toLowerCase());
+                        const backFkName = `${backFieldName}Id`;
+                        
+                        targetModel.properties.push({
+                            type: 'field', name: backFieldName, fieldType: modelName, optional: true,
+                            attributes: [{
+                                type: 'attribute', kind: 'field', name: 'relation',
+                                args: [
+                                    { type: 'attributeArgument', value: `"${relationName}"` },
+                                    { type: 'attributeArgument', value: { type: 'keyValue', key: 'fields', value: { type: 'array', args: [backFkName] } } },
+                                    { type: 'attributeArgument', value: { type: 'keyValue', key: 'references', value: { type: 'array', args: ['id'] } } }
+                                ]
+                            }]
+                        });
+                        targetModel.properties.push({ type: 'field', name: backFkName, fieldType: 'Int', optional: true, attributes: [] });
+                    }
+                }
+
+                else if (field.relationType === 'n-n') {
+                    mainModel.properties.push({
+                        type: 'field', name: field.name, fieldType: field.relationTarget, array: true, attributes: []
+                    });
+                    if (targetModel) {
+                        const backFieldName = getUniqueFieldName(targetModel, modelName.toLowerCase() + 's');
+                        targetModel.properties.push({ type: 'field', name: backFieldName, fieldType: modelName, array: true, attributes: [] });
+                    }
+                }
+
+                else if (field.relationType === '1-1') {
+                    const fkName = `${field.name}Id`;
+                    mainModel.properties.push({
+                        type: 'field', name: field.name, fieldType: field.relationTarget, optional: field.isOptional,
+                        attributes: [{
+                            type: 'attribute', kind: 'field', name: 'relation',
+                            args: [
+                                { type: 'attributeArgument', value: `"${relationName}"` },
+                                { type: 'attributeArgument', value: { type: 'keyValue', key: 'fields', value: { type: 'array', args: [fkName] } } },
+                                { type: 'attributeArgument', value: { type: 'keyValue', key: 'references', value: { type: 'array', args: ['id'] } } }
+                            ]
+                        }] 
+                    });
+                    mainModel.properties.push({ type: 'field', name: fkName, fieldType: 'Int', optional: field.isOptional, attributes: [{ type: 'attribute', kind: 'field', name: 'unique', args: [] }] });
+
+                    if (targetModel) {
+                        const backFieldName = getUniqueFieldName(targetModel, modelName.toLowerCase());
+                        targetModel.properties.push({ 
+                            type: 'field', name: backFieldName, fieldType: modelName, optional: true, 
+                            attributes: [{ type: 'attribute', kind: 'field', name: 'relation', args: [{ type: 'attributeArgument', value: `"${relationName}"` }] }] 
+                        });
+                    }
+                }
+
+            } else {
+                mainModel.properties.push({ type: 'field', name: field.name, fieldType: field.type, optional: field.isOptional, attributes: [] });
+            }
         }
 
         const newContent = printSchema(schema);
