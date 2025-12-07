@@ -1,0 +1,9 @@
+src/
+.github/
+.vscode/
+tsconfig.json
+.gitignore
+.editorconfig
+pnpm-lock.yaml
+yarn.lock
+prisma/
