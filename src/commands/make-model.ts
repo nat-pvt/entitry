@@ -9,7 +9,7 @@ export async function makeModel() {
     const s = spinner();
 
     s.start('Recherche du fichier schema.prisma...');
-    await new Promise(r => setTimeout(r, 800));
+    await new Promise(r => setTimeout(r, 500));
 
     let schemaPath = schemaManager.findPath();
     let existingModels: string[] = [];
@@ -35,20 +35,28 @@ export async function makeModel() {
     }
 
     const modelName = await text({
-        message: 'What is the name of your new model?',
+        message: 'What is the name of your model?',
         placeholder: 'Ex: Product, User...',
         validate(value) {
-            if (value.length === 0) return 'Name is required.';
+            if (!value) return 'Name is required.';
             if (!/^[A-Z][a-zA-Z0-9]*$/.test(value)) return 'The name must begin with a capital letter.';
-            if (existingModels.includes(value)) {
-                return `Model "${value}" already exists!`;
-            }
         },
     });
 
     if (isCancel(modelName)) {
         cancel('Operation canceled.');
         process.exit(0);
+    }
+
+    const name = modelName as string;
+
+    let fieldsInDatabase: string[] = [];
+
+    if (existingModels.includes(name)) {
+        console.log(pc.yellow(`Model "${name}" already exists. Adding new fields to it.`));
+        fieldsInDatabase = schemaManager.getModelFields(schemaPath!, name);
+    } else {
+        console.log(pc.green(`Creating new model "${name}".`));
     }
 
     const fields: ModelField[] = [];
@@ -72,6 +80,12 @@ export async function makeModel() {
             placeholder: 'Ex: title, price, isPublished',
             validate(value) {
                 if (value && !/^[a-z][a-zA-Z0-9]*$/.test(value)) return 'Field name should start with a lowercase letter (camelCase)';
+                if (fieldsInDatabase.includes(value)) {
+                    return `Field "${value}" already exists in model "${name}"!`;
+                }
+                if (fields.some(f => f.name === value)) {
+                    return `You just added "${value}" in this session!`;
+                }
             }
         });
 

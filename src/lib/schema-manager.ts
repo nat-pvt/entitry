@@ -29,6 +29,21 @@ export const schemaManager = {
             .map((item: any) => item.name);
     },
 
+    getModelFields: (schemaPath: string, modelName: string): string[] => {
+        const content = fs.readFileSync(schemaPath, 'utf-8');
+        const schema = getSchema(content);
+
+        const model = schema.list.find(
+            (item: any) => item.type === 'model' && item.name === modelName
+        ) as any;
+
+        if (!model) return [];
+
+        return model.properties
+            .filter((prop: any) => prop.type === 'field')
+            .map((prop: any) => prop.name);
+    },
+
     createBasicSchema: () => {
         const dir = path.dirname(DEFAULT_SCHEMA_PATH);
         if (!fs.existsSync(dir)) {
@@ -53,35 +68,7 @@ datasource db {
         const content = fs.readFileSync(schemaPath, 'utf-8');
         const schema = getSchema(content);
 
-        const idField = {
-            type: 'field',
-            name: 'id',
-            fieldType: 'Int',
-            attributes: [
-                {
-                    type: 'attribute',
-                    kind: 'field',
-                    name: 'id',
-                    args: [] 
-                },
-                {
-                    type: 'attribute',
-                    kind: 'field',
-                    name: 'default',
-                    args: [
-                        {
-                            value: {
-                                type: 'function',
-                                name: 'autoincrement',
-                                args: []
-                            }
-                        }
-                    ]
-                }
-            ]
-        }
-
-        const otherFields = customFields.map(field => ({
+        const newAstFields = customFields.map(field => ({
             type: 'field',
             name: field.name,
             fieldType: field.type,
@@ -89,13 +76,57 @@ datasource db {
             attributes: []
         }));
 
-        const newModel = {
-            type: 'model',
-            name: modelName,
-            properties: [idField, ...otherFields]
-        };
+        const existingModel = schema.list.find(
+            (item: any) => item.type === 'model' && item.name === modelName
+        ) as any;
 
-        schema.list.push(newModel as any);
+        if (existingModel) {
+            const fieldsToAdd = newAstFields.filter(newField =>
+                !existingModel.properties.some((existingProp: any) => 
+                    existingProp.type === 'field' && existingProp.name === newField.name
+                )
+            );
+
+            if (fieldsToAdd.length > 0) {
+                existingModel.properties.push(...fieldsToAdd);
+            }
+        } else {
+            const idField = {
+                type: 'field',
+                name: 'id',
+                fieldType: 'Int',
+                attributes: [
+                    {
+                        type: 'attribute',
+                        kind: 'field',
+                        name: 'id',
+                        args: [] 
+                    },
+                    {
+                        type: 'attribute',
+                        kind: 'field',
+                        name: 'default',
+                        args: [
+                            {
+                                value: {
+                                    type: 'function',
+                                    name: 'autoincrement',
+                                    args: []
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+
+            const newModel = {
+                type: 'model',
+                name: modelName,
+                properties: [idField, ...newAstFields]
+            };
+
+            schema.list.push(newModel as any);
+        }
 
         const newContent = printSchema(schema);
         fs.writeFileSync(schemaPath, newContent);

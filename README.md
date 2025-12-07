@@ -50,7 +50,7 @@ Follow the prompts:
 
   - [x] Schema file detection & initialization
   - [x] Model name validation
-  - [ ] Add primitive fields (String, Int, Boolean...)
+  - [x] Add primitive fields (String, Int, Boolean...)
   - [ ] **Add Relations** (1-1, 1-n, n-n) automatically updating both models
   - [ ] Support for Prisma Attributes (`@unique`, `@default`, etc.)
 
